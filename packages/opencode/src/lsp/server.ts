@@ -33,11 +33,12 @@ type RootFunction = (file: string, ctx: InstanceContext) => Promise<string | und
 
 const NearestRoot = (includePatterns: string[], excludePatterns?: string[]): RootFunction => {
   return async (file, ctx) => {
+    const stop = ctx.worktree === "/" ? ctx.directory : ctx.worktree
     if (excludePatterns) {
       const excludedFiles = Filesystem.up({
         targets: excludePatterns,
         start: path.dirname(file),
-        stop: ctx.directory,
+        stop,
       })
       const excluded = await excludedFiles.next()
       await excludedFiles.return()
@@ -46,7 +47,7 @@ const NearestRoot = (includePatterns: string[], excludePatterns?: string[]): Roo
     const files = Filesystem.up({
       targets: includePatterns,
       start: path.dirname(file),
-      stop: ctx.directory,
+      stop,
     })
     const first = await files.next()
     await files.return()
@@ -66,10 +67,11 @@ export interface Info {
 export const Deno: Info = {
   id: "deno",
   root: async (file, ctx) => {
+    const stop = ctx.worktree === "/" ? ctx.directory : ctx.worktree
     const files = Filesystem.up({
       targets: ["deno.json", "deno.jsonc"],
       start: path.dirname(file),
-      stop: ctx.directory,
+      stop,
     })
     const first = await files.next()
     await files.return()

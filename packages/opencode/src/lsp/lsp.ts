@@ -309,7 +309,32 @@ export const layer = Layer.effect(
     })
 
     const init = Effect.fn("LSP.init")(function* () {
-      yield* InstanceState.get(state)
+      const s = yield* InstanceState.get(state)
+      const cfg = yield* config.get()
+      if (!cfg.lsp_preload) return
+
+      const ctx = yield* InstanceState.context
+      const serverList = Object.values(s.servers)
+      const toPreload =
+        cfg.lsp_preload === true
+          ? serverList
+          : serverList.filter((server) => (cfg.lsp_preload as string[]).includes(server.id))
+
+      const seen = new Set<string>()
+      const seeds: string[] = []
+      for (const server of toPreload) {
+        if (!server.extensions.length) continue
+        const ext = server.extensions[0]
+        if (seen.has(ext)) continue
+        seen.add(ext)
+        seeds.push(path.join(ctx.directory, ".lsp-preload" + ext))
+      }
+
+      yield* Effect.forEach(
+        seeds,
+        (seedFile) => getClients(seedFile).pipe(Effect.catch(() => Effect.void)),
+        { concurrency: "unbounded", discard: true },
+      )
     })
 
     const status = Effect.fn("LSP.status")(function* () {

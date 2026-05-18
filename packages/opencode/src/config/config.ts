@@ -223,6 +223,12 @@ export const Info = Schema.Struct({
     description:
       "Enable or configure LSP servers. Omit or set to false to disable, true to enable built-ins, or an object to enable built-ins with overrides.",
   }),
+  lsp_preload: Schema.optional(
+    Schema.Union([Schema.Boolean, Schema.mutable(Schema.Array(Schema.String))]),
+  ).annotate({
+    description:
+      "Preload LSP servers at project open. true to preload all configured servers, or an array of server IDs to preload specific ones.",
+  }),
   instructions: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Additional instruction files or patterns to include",
   }),
