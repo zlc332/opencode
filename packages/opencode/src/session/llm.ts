@@ -1,6 +1,6 @@
 import { Provider } from "@/provider/provider"
 import * as Log from "@opencode-ai/core/util/log"
-import { Context, Duration, Effect, Layer, Record } from "effect"
+import { Context, Effect, Layer, Record } from "effect"
 import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
 import { mergeDeep } from "remeda"
@@ -9,7 +9,7 @@ import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
 import type { Agent } from "@/agent/agent"
-import { MessageV2 } from "./message-v2"
+import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { SystemPrompt } from "./system"
 import { Permission } from "@/permission"
@@ -26,7 +26,6 @@ import * as OtelTracer from "@effect/opentelemetry/Tracer"
 
 const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
-const DEFAULT_STREAM_IDLE_TIMEOUT = Duration.seconds(120)
 type Result = Awaited<ReturnType<typeof streamText>>
 
 // Avoid re-instantiating remeda's deep merge types in this hot LLM path; the runtime behavior is still mergeDeep.
@@ -415,34 +414,8 @@ const live: Layer.Layer<
             )
 
             const result = yield* run({ ...input, abort: ctrl.signal })
-            const idleTimeout = flags.streamIdleTimeoutMs
-              ? Duration.millis(flags.streamIdleTimeoutMs)
-              : DEFAULT_STREAM_IDLE_TIMEOUT
 
-            return Stream.fromAsyncIterable(result.fullStream, (e) => (e instanceof Error ? e : new Error(String(e)))).pipe(
-              Stream.timeoutOrElse({
-                duration: idleTimeout,
-                orElse: () =>
-                  Stream.fromEffect(
-                    Effect.logError("LLM stream idle timeout, aborting", {
-                      providerID: input.model.providerID,
-                      modelID: input.model.id,
-                      sessionID: input.sessionID,
-                    }).pipe(
-                      Effect.andThen(Effect.sync(() => ctrl.abort())),
-                      Effect.andThen(
-                        Effect.fail(
-                          new MessageV2.APIError({
-                            message: `LLM stream idle timeout`,
-                            isRetryable: true,
-                            statusCode: undefined,
-                          }),
-                        ),
-                      ),
-                    ),
-                  ),
-              }),
-            )
+            return Stream.fromAsyncIterable(result.fullStream, (e) => (e instanceof Error ? e : new Error(String(e))))
           }),
         ),
       )
